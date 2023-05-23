@@ -1,0 +1,61 @@
+/**
+ * A ULA (Unidade Lógica e Artimética).
+ * Calcula uma das seguintes funções:
+ * x+y, x-y, y-x, 0, 1, -1, x, y, -x, -y, !x, !y,
+ * x+1, y+1, x-1, y-1, x&y, x|y em duas entradas de 16 bits,
+ * de acordo com 6 bits de entrada denotados por zx,nx,zy,ny,f,no.
+ * Além disso, a ULA calcula duas saídas de 1-bit:
+ * se a saída da ULA == 0, zr é setado para 1; caso contrário zr é setado para 0;
+ * se a saída da ULA < 0, ng é setado para 1; caso contrário ng é setado para 0.
+ */
+
+// Implementação: a lógica da ULA manipula as entradas x e y
+// e opera nos valores resultantes, como segue:
+// if (zx == 1) set x = 0        // constante de 16 bits
+// if (nx == 1) set x = !x       // not bit a bit
+// if (zy == 1) set y = 0        // constante de 16 bits
+// if (ny == 1) set y = !y       // not bit a bit
+// if (f == 1)  set out = x + y  // adição inteira em complemento de 2
+// if (f == 0)  set out = x & y  // and bit a bit
+// if (no == 1) set out = !out   // not bit a bit
+// if (out == 0) set zr = 1
+// if (out < 0) set ng = 1
+
+CHIP ALU {
+    IN
+        x[16], y[16],  // entradas de 16 bits
+        zx, // zera a entrada x?
+        nx, // nega a entrada x?
+        zy, // zera a entrada y?
+        ny, // nega a entrada y?
+        f,  // calcula out = x + y (if 1) or x & y (if 0)
+        no; // nega a saída out?
+
+    OUT
+        out[16], // saída de 16 bits
+        zr, // 1 if (out == 0), 0 caso contrário
+        ng; // 1 if (out < 0),  0 caso contrário
+
+    PARTS:
+    Mux16(a=x, b=false, sel=zx, out=x1);
+    Mux16(a=y, b=false, sel=zy, out=y1);
+
+    Not16(in=x1, out=notx1);
+    Mux16(a=x1, b=notx1, sel=nx, out=x2);
+    Not16(in=y1, out=noty1);
+    Mux16(a=y1, b=noty1, sel=ny, out=y2);
+
+    Add16(a=x2, b=y2, out=addout);
+    And16(a=x2, b=y2, out=andout);
+    Mux16(a=andout, b=addout, sel=f, out=fout);
+
+    Not16(in=fout, out=notfout);
+    Mux16(a=fout, b=notfout, sel=no, out=out, out[0..7]=out7, out[8..15]=out15, out[15]=isng);
+
+    Or8Way(in=out7, out=zr0);
+    Or8Way(in=out15, out=zr1);
+    Or(a=zr0, b=zr1, out=zr2);
+    Not(in=zr2, out=zr);
+
+    And(a=isng, b=true, out=ng);
+}
